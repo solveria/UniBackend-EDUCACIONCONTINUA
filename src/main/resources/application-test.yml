@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:peopleu_continuing_education_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+peopleu:
+  dev-fallback:
+    enabled: true
+  service-account:
+    client-secret: test-only-service-account-secret
+  outbox:
+    relay:
+      enabled: false
+
+security:
+  jwt:
+    enabled: false

@@ -1,0 +1,12 @@
+server:
+  port: ${PU_CONTINUING_EDUCATION_SERVICE_PORT:8104}
+
+spring:
+  datasource:
+    url: ${PU_CONTINUING_EDUCATION_DB_URL:jdbc:postgresql://${PU_CONTINUING_EDUCATION_DB_HOST:127.0.0.1}:${PU_CONTINUING_EDUCATION_DB_PORT:5454}/${PU_CONTINUING_EDUCATION_DB_NAME:peopleu_continuing_education_service}}
+    username: ${PU_CONTINUING_EDUCATION_DB_USER:postgres}
+    password: ${PU_CONTINUING_EDUCATION_DB_PASSWORD:postgres}
+
+peopleu:
+  dev-fallback:
+    enabled: true

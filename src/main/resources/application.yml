@@ -1,0 +1,120 @@
+spring:
+  application:
+    name: peopleu-continuing-education-service
+  profiles:
+    default: prod
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${PU_CONTINUING_EDUCATION_DB_URL:jdbc:postgresql://localhost:${PU_CONTINUING_EDUCATION_DB_PORT:5454}/${PU_CONTINUING_EDUCATION_DB_NAME:peopleu_continuing_education_service}}
+    username: ${PU_CONTINUING_EDUCATION_DB_USER:postgres}
+    password: ${PU_CONTINUING_EDUCATION_DB_PASSWORD:postgres}
+    hikari:
+      pool-name: peopleu-continuing-education-service-hikari
+      maximum-pool-size: ${PU_CONTINUING_EDUCATION_DB_POOL_MAX:10}
+      minimum-idle: ${PU_CONTINUING_EDUCATION_DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${PU_CONTINUING_EDUCATION_DB_CONN_TIMEOUT_MS:10000}
+      validation-timeout: ${PU_CONTINUING_EDUCATION_DB_VALID_TIMEOUT_MS:3000}
+      initialization-fail-timeout: 0
+  flyway:
+    # Las migraciones se numeran POR MODULO y no por orden de llegada (V101 es EC-01, V104 es
+    # EC-04...). Los modulos no llegan en orden, asi que una base que ya tenga V104 tiene que
+    # aceptar una V102 que entre despues. Ver docs/db.
+    out-of-order: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: ${PU_CONTINUING_EDUCATION_SERVICE_PORT:8104}
+  shutdown: graceful
+  # El access token de IAM lleva TODOS los permisos del rol como claim y crece con cada pantalla.
+  # Sumado a las cookies que el navegador comparte entre puertos de localhost, el bloque de
+  # cabeceras supera los 8 KB por defecto de Tomcat y el frontend ve "Failed to fetch" en todo.
+  max-http-request-header-size: ${MAX_HTTP_REQUEST_HEADER_SIZE:64KB}
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
+
+peopleu:
+  # Sin JWT y solo en los perfiles dev y test, el actor y el tenant salen de cabeceras.
+  dev-fallback:
+    enabled: false
+  # La cuenta con la que este servicio le habla a IAM y a los demas cuando no hay una persona
+  # delante (relay del outbox, barridos). Se da de alta en IAM (iam_service_account) con el
+  # client-id de abajo.
+  service-account:
+    client-id: peopleu-continuing-education-service
+    client-secret: ${PU_CONTINUING_EDUCATION_SERVICE_ACCOUNT_CLIENT_SECRET:}
+    tenant-id: ${PU_CONTINUING_EDUCATION_SERVICE_ACCOUNT_TENANT_ID:11111111-1111-1111-1111-111111111111}
+  outbox:
+    relay:
+      enabled: ${PU_CONTINUING_EDUCATION_OUTBOX_RELAY_ENABLED:true}
+      batch-size: 50
+      delay-ms: 30000
+      initial-delay-ms: 15000
+  cors:
+    allowed-origins: ${PU_CONTINUING_EDUCATION_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001}
+
+security:
+  # El rol que puede operar sin person_id (PlatformActor): el administrador de la plataforma.
+  platform-admin-role: ${IAM_PLATFORM_ADMIN_ROLE:ADMIN_GLOBAL}
+  jwt:
+    enabled: ${JWT_ENABLED:true}
+    issuer: ${IAM_JWT_ISSUER:iam-service}
+    # Las claves publicas con las que IAM firma (RS256). Se leen una vez y se cachean; ante un
+    # kid desconocido se vuelven a pedir, asi IAM rota su clave sin reiniciar nada aca. No hay
+    # secreto compartido: este servicio solo verifica, nunca firma.
+    jwk-set-uri: ${IAM_JWKS_URI:${IAM_SERVICE_URL:http://localhost:8080}/.well-known/jwks.json}
+    # El nombre de ESTE servicio: un token que no lo nombre no entra. IAM nombra a todos en el
+    # login (modo all) o se canjea por destino (modo session-only).
+    audience: ${IAM_JWT_AUDIENCE:peopleu-continuing-education-service}
+    # Llamadas salientes a otros servicios: el token de la persona se canjea en IAM por uno que
+    # nombre al destino (cada servicio valida su propia audiencia). Si el canje falla va el token
+    # original, que sirve mientras IAM este en modo all.
+    outbound:
+      exchange-enabled: ${IAM_TOKEN_EXCHANGE_ENABLED:true}
+      iam-url: ${IAM_SERVICE_URL:http://localhost:8080}
+      audiences:
+        - base-url: ${PU_TRANSVERSAL_SERVICE_URL:http://localhost:8101}
+          audience: peopleu-transversal-service
+        - base-url: ${AI_SERVICE_URL:http://localhost:8091}
+          audience: ai-service
+    revocation:
+      redis:
+        host: ${IAM_REDIS_HOST:localhost}
+        port: ${IAM_REDIS_PORT:6379}
+        database: ${IAM_REDIS_DATABASE:0}
+        password: ${IAM_REDIS_PASSWORD:}
+
+solveria:
+  i18n:
+    default-locale: es
+    supported-locales:
+      - es
+      - en
+    basenames:
+      - i18n/messages
+      - core-i18n/messages
